@@ -1,0 +1,43 @@
+#spring.application.name=Blog-app-apis
+spring:
+  profiles:
+    active: prod
+
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+    properties:
+      hibernate:
+        data:
+          format_sql: true
+#  servlet:
+#    multipart:
+#      enabled: true
+#      max-file-size: 10MB
+#      max-request-size: 10MB
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: "letuyet20042002@gmail.com"
+    password: "xmgy ilsk wvsc jeii"
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+project:
+  jwtSecret: conghoaxahoichunghiavietnam-doclap-tudo-hanhphuc
+  images: images/
+
+base:
+  url: "http://localhost:8080"

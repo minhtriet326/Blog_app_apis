@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    username: triet
+    password: minhtriet123
+    url: jdbc:mysql://blog-db.cfwwccq0en65.ap-southeast-2.rds.amazonaws.com:3306/blog_app_apis
