@@ -40,15 +40,13 @@ public class PostServiceImpl implements PostService {
     private final CategoryRepository categoryRepository;
     private final ImageService imageService;
     private final CommentService commentService;
-    private final EntityManager entityManager;
 
-    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, CategoryRepository categoryRepository, ImageService imageService, CommentService commentService, EntityManager entityManager) {
+    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, CategoryRepository categoryRepository, ImageService imageService, CommentService commentService) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.categoryRepository = categoryRepository;
         this.imageService = imageService;
         this.commentService = commentService;
-        this.entityManager = entityManager;
     }
 
     @Value("${project.images}")
