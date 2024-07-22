@@ -28,7 +28,7 @@ public class PostDTO {
     @NotEmpty(message = "This field can't be empty")
     private String content;
 
-    private String imageName;
+    private List<String> imageNames;
 
     private Date addedDate;
 
@@ -40,5 +40,5 @@ public class PostDTO {
 
     private String category;
 
-    private String imageUrl;
+    private List<String> imageUrl;
 }

@@ -30,7 +30,8 @@ public class Post {
     @Column(columnDefinition = "LONGTEXT")
     private String content;
 
-    private String imageName;
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Image> images;
 
     @NotNull(message = "This field can't be null")
     private Date addedDate;

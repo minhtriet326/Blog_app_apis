@@ -11,7 +11,7 @@ import java.util.Map;
 
 public interface PostService {
     //POST
-    PostDTO addPost(PostDTO postDTO, Integer userId, Integer categoryId, MultipartFile file) throws IOException;
+    PostDTO addPost(PostDTO postDTO, Integer userId, Integer categoryId, MultipartFile[] files) throws IOException;
     //GET
     List<PostDTO> getAllPosts();
     PostDTO getPostById(Integer postId);
@@ -21,7 +21,7 @@ public interface PostService {
     PostPageResponse getAllPostsWithPagination(Integer pageNumber, Integer pageSize);
     PostPageResponse getAllPostsWithPaginationAndSorting(Integer pageNumber, Integer pageSize, String sortBy, String dir);
     //PUT
-    PostDTO updatePost(PostDTO postDTO, Integer postId, Integer categoryId, MultipartFile file) throws IOException;
+    PostDTO updatePost(PostDTO postDTO, Integer postId, Integer categoryId, MultipartFile[] files) throws IOException;
     //DELETE
     Map<String, String> deletePost(Integer postId) throws IOException;
 }

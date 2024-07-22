@@ -1,5 +1,6 @@
 package com.blog.controllers;
 
+import com.blog.exceptions.FileServiceException;
 import com.blog.payloads.CategoryDTO;
 import com.blog.payloads.PostDTO;
 import com.blog.payloads.PostPageResponse;
@@ -47,9 +48,11 @@ public class PostController {
     public ResponseEntity<PostDTO> addPostHandler(@RequestPart String postDTOstr,
                                                   @RequestParam Integer userId,
                                                   @RequestParam Integer categoryId,
-                                                  @RequestPart(required = false) MultipartFile file) throws IOException {
+                                                  @RequestPart(required = false) MultipartFile[] files) throws IOException {
+
         PostDTO postDTO = convertJSONToPostDTO(postDTOstr);
-        return ResponseEntity.status(HttpStatus.CREATED).body(postService.addPost(postDTO, userId, categoryId, file));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(postService.addPost(postDTO, userId, categoryId, files));
     }
 
     @Operation(
@@ -196,9 +199,9 @@ public class PostController {
     public ResponseEntity<PostDTO> updatePostHandler(@RequestPart String postDTOstr,
                                                      @RequestParam Integer postId,
                                                      @RequestParam(required = false) Integer categoryId,
-                                                     @RequestPart(required = false) MultipartFile file) throws IOException {
+                                                     @RequestPart(required = false) MultipartFile[] files) throws IOException {
         PostDTO postDTO = convertJSONToPostDTO(postDTOstr);
-        return ResponseEntity.status(HttpStatus.OK).body(postService.updatePost(postDTO, postId, categoryId, file));
+        return ResponseEntity.status(HttpStatus.OK).body(postService.updatePost(postDTO, postId, categoryId, files));
     }
 
     @Operation(

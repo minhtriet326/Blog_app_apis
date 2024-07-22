@@ -1,7 +1,7 @@
 #spring.application.name=Blog-app-apis
 spring:
   profiles:
-    active: prod
+    active: dev
 
 
   jpa:

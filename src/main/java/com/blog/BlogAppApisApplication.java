@@ -19,7 +19,7 @@ public class BlogAppApisApplication implements CommandLineRunner {// interface n
     }
 
     public static void main(String[] args) {
-		System.setProperty(AbstractEnvironment.ACTIVE_PROFILES_PROPERTY_NAME, "prod");
+//		System.setProperty(AbstractEnvironment.ACTIVE_PROFILES_PROPERTY_NAME, "prod");
 		SpringApplication.run(BlogAppApisApplication.class, args);
 	}
 

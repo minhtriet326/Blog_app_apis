@@ -1,6 +1,7 @@
 package com.blog.services;
 
 import com.blog.entities.Category;
+import com.blog.entities.Image;
 import com.blog.entities.Post;
 import com.blog.entities.User;
 import com.blog.exceptions.FileServiceException;
@@ -8,17 +9,21 @@ import com.blog.exceptions.ResourceNotFoundException;
 import com.blog.payloads.PostDTO;
 import com.blog.payloads.PostPageResponse;
 import com.blog.repositories.CategoryRepository;
+import com.blog.repositories.ImageRepository;
 import com.blog.repositories.PostRepository;
 import com.blog.repositories.UserRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
 import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -31,19 +36,19 @@ import java.util.stream.Collectors;
 @Service
 public class PostServiceImpl implements PostService {
     private final PostRepository postRepository;
-    private final ModelMapper modelMapper;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
-    private final FileService fileService;
+    private final ImageService imageService;
     private final CommentService commentService;
+    private final EntityManager entityManager;
 
-    public PostServiceImpl(PostRepository postRepository, ModelMapper modelMapper, UserRepository userRepository, CategoryRepository categoryRepository, FileService fileService, CommentService commentService) {
+    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, CategoryRepository categoryRepository, ImageService imageService, CommentService commentService, EntityManager entityManager) {
         this.postRepository = postRepository;
-        this.modelMapper = modelMapper;
         this.userRepository = userRepository;
         this.categoryRepository = categoryRepository;
-        this.fileService = fileService;
+        this.imageService = imageService;
         this.commentService = commentService;
+        this.entityManager = entityManager;
     }
 
     @Value("${project.images}")
@@ -56,30 +61,24 @@ public class PostServiceImpl implements PostService {
     public PostDTO addPost(PostDTO postDTO,
                            Integer userId,
                            Integer categoryId,
-                           MultipartFile file) throws IOException {
+                           MultipartFile[] files) throws IOException {
 
-        String filename = "default.png";
-
-        if(file != null) {
-            if(Files.exists(Paths.get(path + File.separator + file.getOriginalFilename()))) {
-                throw new FileServiceException("Filename is already existed! Please enter another filename.");
-            }
-
-            filename = fileService.uploadFile(path, file);
+        if (files != null && files.length > 5) {
+            throw new FileServiceException("Can not upload more than 5 images");
         }
 
+        // 1-tạo 1 đt Post trước
         User existingUser = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "userId", Integer.toString(userId)));
 
         Category existingCategory = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "categoryId", Integer.toString(categoryId)));
 
-        //create Post object
         Post post = Post.builder()
                 .postId(null)
                 .title(postDTO.getTitle())
                 .content(postDTO.getContent())
-                .imageName(filename)
+                .images(new ArrayList<>())
                 .addedDate(new Date())
                 .lastUpdated(new Date())
                 .user(existingUser)
@@ -87,13 +86,20 @@ public class PostServiceImpl implements PostService {
                 .category(existingCategory)
                 .build();
 
-        Post savedPost = postRepository.save(post);
+        Post firstSavedPost = postRepository.save(post);
 
-        //create imageUrl
-        String imageUrl = filename.equals("default.png") ? null : baseUrl + "/file/" + filename;
+        // 2-tạo và lưu các đt Image
+        List<Image> imageList = new ArrayList<>();
 
-        //create PostDTO object
-        return postToDTO(savedPost);
+        if (files != null) {
+            imageList = imageService.saveAllImages(firstSavedPost, files);
+        }
+
+        firstSavedPost.setImages(imageList);
+
+        Post lastSavedPost = postRepository.save(firstSavedPost);
+
+        return postToDTO(lastSavedPost);
     }
 
     @Override
@@ -208,7 +214,12 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public PostDTO updatePost(PostDTO postDTO, Integer postId, Integer categoryId, MultipartFile file) throws IOException {
+    public PostDTO updatePost(PostDTO postDTO, Integer postId, Integer categoryId, MultipartFile[] files) throws IOException {
+
+        // Kiểm tra sl ảnh upload phải <= 5
+        if(files != null && files.length > 5) {
+            throw new FileServiceException("Can not upload more than 5 images");
+        }
 
         // kiểm tra post tồn tại
         Post existingPost = postRepository.findById(postId)
@@ -228,43 +239,37 @@ public class PostServiceImpl implements PostService {
                     .orElseThrow(() -> new ResourceNotFoundException("Category", "categoryId", Integer.toString(categoryId)));
         }
 
-        // lấy tên file cũ
-        String filename = existingPost.getImageName();
+        // upload ảnh mới và xóa hết ảnh cũ
+        if (files != null) {
+            // store all Image object which will be deleted
+            List<Image> deleteImage = imageService.findByPost(existingPost);
 
-        if(file != null) {
-//            if(Files.exists(Paths.get(path + File.separator + file.getOriginalFilename()))) {
-//
-//                if(file.getOriginalFilename().equals(existingPost.getImageName())) {
-//
-//                    Files.deleteIfExists(Paths.get(path + File.separator + existingPost.getImageName()));
-//
-//                    filename = fileService.uploadFile(path, file);
-//
-//                } else {
-//                    throw new FileServiceException("Filename is already existed! Please enter another filename.");
-//                }
-//
-//            } else {
-//                filename = fileService.uploadFile(path, file);
-//            }
-            Files.deleteIfExists(Paths.get(path + File.separator + existingPost.getImageName()));
+            // delete in local
+            deleteImage.forEach(image ->
+            {
+                try {
+                    // xóa các ảnh lưu local
+                    Files.deleteIfExists(Paths.get(path + File.separator + image.getImageName()));
 
-            filename = fileService.uploadFile(path, file);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            // delete all old images
+            imageService.deleteAllImages(deleteImage);
+
+            // save all new images
+            imageService.saveAllImages(existingPost, files);
         }
 
-        Post updatedPost = Post.builder()
-                .postId(postId)
-                .title(postDTO.getTitle())
-                .content(postDTO.getContent())
-                .imageName(filename)
-                .addedDate(existingPost.getAddedDate())
-                .lastUpdated(new Date())
-                .user(existingPost.getUser())
-                .comments(existingPost.getComments())
-                .category(setCategory)
-                .build();
+        // update Post
+        existingPost.setTitle(postDTO.getTitle());
+        existingPost.setContent(postDTO.getContent());
+        existingPost.setLastUpdated(new Date());
+        existingPost.setCategory(setCategory);
 
-        Post savedPost = postRepository.save(updatedPost);
+        Post savedPost = postRepository.save(existingPost);
 
         return postToDTO(savedPost);
     }
@@ -275,7 +280,14 @@ public class PostServiceImpl implements PostService {
         Post existingPost = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post", "postId", Integer.toString(postId)));
 
-        Files.deleteIfExists(Paths.get(path + File.separator + existingPost.getImageName()));
+        existingPost.getImages().forEach(image ->
+        {
+            try {
+                Files.deleteIfExists(Paths.get(path + File.separator + image.getImageName()));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
 
         postRepository.delete(existingPost);
 
@@ -287,14 +299,17 @@ public class PostServiceImpl implements PostService {
                 .postId(post.getPostId())
                 .title(post.getTitle())
                 .content(post.getContent())
-                .imageName(post.getImageName())
+                .imageNames(post.getImages().stream().map(
+                        Image::getImageName).collect(Collectors.toList()))
                 .addedDate(post.getAddedDate())
                 .lastUpdated(post.getLastUpdated())
                 .user(post.getUser().getName())
                 .commentDTOList(post.getComments().stream().map(
                         commentService::commentToDTO).collect(Collectors.toList()))
                 .category(post.getCategory().getTitle())
-                .imageUrl(baseUrl + "/file/" + post.getImageName())
+                .imageUrl(post.getImages().stream().map(
+                        image -> baseUrl + "/file/" + image.getImageName()
+                ).collect(Collectors.toList()))
                 .build();
     }
 }
